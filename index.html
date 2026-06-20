@@ -3,18 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Paciência (Solitaire) - Proporção Áurea Mobile</title>
+    <title>Mini Paciência (Solitaire) - Regras Completas</title>
     <style>
         :root {
-            /* Largura mantida conforme o ajuste anterior */
             --card-width: 12vw;
-            /* Altura adaptada para a Proporção Áurea (12vw * 1.618 ≈ 19.4vw) */
             --card-height: 19.4vw;
-            
             --card-max-width: 80px;
-            /* Altura máxima em desktop com Proporção Áurea (80px * 1.618 ≈ 130px) */
             --card-max-height: 130px;
-            
             --card-spacing: 4.5vw;
             --card-max-spacing: 30px;
         }
@@ -92,7 +87,6 @@
         }
 
         .card {
-            /* Corrigido: Agora a carta força seu próprio tamanho áureo em vez de dar 100% na coluna */
             width: var(--card-width);
             height: var(--card-height);
             max-width: var(--card-max-width);
@@ -103,20 +97,39 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 4px;
+            padding: 2px;
             box-sizing: border-box;
             position: absolute;
             cursor: pointer;
             font-weight: bold;
-            font-size: 0.9rem;
+            font-size: 1.3rem;
             line-height: 1;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, top 0.3s ease;
         }
 
         @media (min-width: 400px) {
             .card {
-                font-size: 1.1rem;
-                padding: 6px;
+                font-size: 1.5rem;
+                padding: 4px;
             }
+        }
+
+        .card.anim-foundation {
+            animation: enterFoundation 0.35s ease-in-out;
+        }
+
+        @keyframes enterFoundation {
+            0% { transform: scale(1.15); box-shadow: 0px 0px 12px #fff; }
+            100% { transform: scale(1); box-shadow: 1px 1px 4px rgba(0,0,0,0.3); }
+        }
+
+        .card.anim-flip {
+            animation: flipCard 0.4s ease-out;
+        }
+
+        @keyframes flipCard {
+            0% { transform: rotateY(90deg); background-color: #b71c1c; }
+            100% { transform: rotateY(0deg); background-color: white; }
         }
 
         .card.back {
@@ -190,9 +203,7 @@
         let selectedElement = null;
 
         function getCardSpacing() {
-            if (window.innerWidth >= 600) {
-                return 30; 
-            }
+            if (window.innerWidth >= 600) return 30; 
             return window.innerWidth * 0.045;
         }
 
@@ -234,7 +245,8 @@
             cardDiv.dataset.suit = card.suit;
             cardDiv.dataset.color = card.color;
 
-            cardDiv.innerHTML = `<div>${card.value}${card.suit}</div><div class="bottom-suit">${card.value}${card.suit}</div>`;
+            const displayValue = card.value === '10' ? '10' : card.value;
+            cardDiv.innerHTML = `<div>${displayValue}${card.suit}</div><div class="bottom-suit">${displayValue}${card.suit}</div>`;
             cardDiv.classList.add(card.color);
 
             if (!isFaceUp) {
@@ -242,6 +254,7 @@
                 cardDiv.onclick = (e) => revealCard(e, cardDiv);
             } else {
                 cardDiv.onclick = (e) => selectCard(e, cardDiv);
+                cardDiv.ondblclick = (e) => autoSendToFoundation(e, cardDiv);
             }
             return cardDiv;
         }
@@ -264,30 +277,52 @@
             wastePile.push(cardData);
             
             const waste = document.getElementById('waste');
-            waste.innerHTML = '';
-            waste.appendChild(createCardHTML(cardData, 0, true));
+            const cardDiv = createCardHTML(cardData, 0, true);
+            waste.appendChild(cardDiv);
             updateStockDisplay();
         }
 
         function revealCard(event, cardDiv) {
-            event.stopPropagation();
+            if (event) event.stopPropagation();
             const parent = cardDiv.parentElement;
             
-            if (cardDiv === parent.lastElementChild) {
+            if (cardDiv === parent.lastElementChild && cardDiv.classList.contains('back')) {
                 cardDiv.classList.remove('back');
+                cardDiv.classList.add('anim-flip');
                 cardDiv.onclick = (e) => selectCard(e, cardDiv);
+                cardDiv.ondblclick = (e) => autoSendToFoundation(e, cardDiv);
+                
+                setTimeout(() => cardDiv.classList.remove('anim-flip'), 400);
             }
+        }
+
+        function autoRevealTopCards() {
+            document.querySelectorAll('.column').forEach(col => {
+                if (col.children.length > 0) {
+                    const topCard = col.lastElementChild;
+                    if (topCard.classList.contains('back')) {
+                        revealCard(null, topCard);
+                    }
+                }
+            });
         }
 
         function selectCard(event, cardDiv) {
             event.stopPropagation();
             
+            // CORREÇÃO: Se clicar na mesma carta já selecionada, apenas cancela a seleção
+            if (selectedElement === cardDiv) {
+                resetSelection();
+                return;
+            }
+
             if (!selectedElement) {
                 selectedElement = cardDiv;
                 cardDiv.style.outline = "3px solid #ffeb3b";
                 cardDiv.style.zIndex = "999"; 
             } else {
                 const parent = cardDiv.parentElement;
+                // Ao clicar em uma carta exposta tendo outra selecionada, tenta mover para a coluna dela
                 if (parent.classList.contains('column') && cardDiv === parent.lastElementChild) {
                     moveCardToColumn(selectedElement, parent);
                 }
@@ -308,10 +343,105 @@
             };
         });
 
+        function autoSendToFoundation(event, cardDiv) {
+            if (event) event.stopPropagation();
+            if (cardDiv.nextElementSibling) return false;
+
+            const foundations = document.querySelectorAll('.slot.foundation');
+            let targetFoundation = Array.from(foundations).find(f => f.dataset.suit === cardDiv.dataset.suit);
+
+            if (targetFoundation) {
+                if (cardDiv.dataset.value === 'A' && targetFoundation.children.length === 0) {
+                    executeFoundationMove(cardDiv, targetFoundation);
+                    resetSelection();
+                    return true;
+                } else if (targetFoundation.children.length > 0) {
+                    const topFoundationCard = targetFoundation.lastElementChild;
+                    const currentValueIdx = values.indexOf(cardDiv.dataset.value);
+                    const topValueIdx = values.indexOf(topFoundationCard.dataset.value);
+                    
+                    if (currentValueIdx === topValueIdx + 1) {
+                        executeFoundationMove(cardDiv, targetFoundation);
+                        resetSelection();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function executeFoundationMove(cardDiv, foundation) {
+            cardDiv.style.top = '0px';
+            cardDiv.style.outline = 'none';
+            cardDiv.style.zIndex = '';
+            
+            cardDiv.onclick = null; 
+            cardDiv.ondblclick = null;
+            
+            if(cardDiv.parentElement && cardDiv.parentElement.id === 'waste') {
+                wastePile.pop();
+            }
+
+            foundation.appendChild(cardDiv);
+            
+            cardDiv.classList.add('anim-foundation');
+            setTimeout(() => cardDiv.classList.remove('anim-foundation'), 350);
+
+            setTimeout(() => {
+                autoRevealTopCards();
+                checkAllAutomovements();
+            }, 100);
+        }
+
+        function checkAllAutomovements() {
+            let movedAny = false;
+            
+            document.querySelectorAll('.column').forEach(col => {
+                if (col.children.length > 0) {
+                    const card = col.lastElementChild;
+                    if (!card.classList.contains('back')) {
+                        if (autoSendToFoundation(null, card)) movedAny = true;
+                    }
+                }
+            });
+
+            const waste = document.getElementById('waste');
+            if (waste && waste.children.length > 0) {
+                if (autoSendToFoundation(null, waste.lastElementChild)) movedAny = true;
+            }
+
+            if (movedAny) {
+                setTimeout(checkAllAutomovements, 150);
+            }
+        }
+
+        // CORREÇÃO: Implementação das regras rígidas de empilhamento do Solitaire (Número decrescente + Cor alternada)
         function moveCardToColumn(card, column) {
             const sourceColumn = card.parentElement;
-            const spacing = getCardSpacing();
             
+            // Impede mover se você tentar soltar a carta na mesma coluna em que ela já está
+            if (sourceColumn === column) return;
+
+            const spacing = getCardSpacing();
+
+            // Se a coluna destino já tiver cartas, precisamos validar a última carta dela
+            if (column.children.length > 0) {
+                const targetCard = column.lastElementChild;
+
+                const cardValueIdx = values.indexOf(card.dataset.value);
+                const targetValueIdx = values.indexOf(targetCard.dataset.value);
+
+                // Regra 1: A cor precisa ser diferente (Preto vs Vermelho)
+                // Regra 2: O valor da carta movida deve ser exatamente 1 número MENOR do que o alvo
+                if (card.dataset.color === targetCard.dataset.color || cardValueIdx !== targetValueIdx - 1) {
+                    return; // Movimento inválido, cancela a operação
+                }
+            } else {
+                // Regra Tradicional opcional: Se a coluna estiver vazia, apenas Reis (K) podem iniciar a coluna.
+                if (card.dataset.value !== 'K') return;
+            }
+            
+            // Movimentando a carta (e possíveis cartas filhas que estejam presas a ela)
             if (sourceColumn && sourceColumn.classList.contains('column')) {
                 const cardsArray = Array.from(sourceColumn.children);
                 const cardIndex = cardsArray.indexOf(card);
@@ -323,21 +453,34 @@
                     column.appendChild(c);
                 });
             } else {
+                // Se veio do monte de descarte (waste)
+                if (sourceColumn && sourceColumn.id === 'waste') wastePile.pop();
                 const topOffset = column.children.length * spacing;
                 card.style.top = `${topOffset}px`;
                 column.appendChild(card);
             }
+
+            setTimeout(() => {
+                autoRevealTopCards();
+                checkAllAutomovements();
+            }, 100);
         }
 
         function moveCardToFoundation(card, foundation) {
             if (card.nextElementSibling) return; 
 
-            if (foundation.children.length === 0 && card.dataset.value === 'A') {
-                card.style.top = '0px';
-                foundation.appendChild(card);
-            } else if (card.dataset.suit === foundation.dataset.suit) {
-                card.style.top = '0px';
-                foundation.appendChild(card);
+            if (card.dataset.suit === foundation.dataset.suit) {
+                if (foundation.children.length === 0 && card.dataset.value === 'A') {
+                    executeFoundationMove(card, foundation);
+                } else if (foundation.children.length > 0) {
+                    const topFoundationCard = foundation.lastElementChild;
+                    const currentValueIdx = values.indexOf(card.dataset.value);
+                    const topValueIdx = values.indexOf(topFoundationCard.dataset.value);
+                    
+                    if (currentValueIdx === topValueIdx + 1) {
+                        executeFoundationMove(card, foundation);
+                    }
+                }
             }
         }
 
