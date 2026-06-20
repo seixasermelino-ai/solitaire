@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Paciência (Solitaire) - Pro</title>
+    <title>Paciência Simplificado Pro</title>
     <style>
         :root {
             --card-width: 12vw;
@@ -26,7 +26,7 @@
             background-color: #2e7d32;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
-            padding: 10px 5px;
+            padding: 15px 5px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -35,15 +35,6 @@
             box-sizing: border-box;
         }
 
-        h1 {
-            color: white;
-            margin: 0 0 5px 0;
-            font-size: 1.4rem;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
-            text-align: center;
-        }
-
-        /* Painel de Controle (Timer e Reiniciar) */
         .controls {
             display: flex;
             align-items: center;
@@ -64,8 +55,12 @@
             border-radius: 4px;
         }
 
-        .btn-restart {
-            background-color: #1565c0;
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
             color: white;
             border: none;
             padding: 6px 14px;
@@ -77,9 +72,10 @@
             transition: background 0.2s;
         }
 
-        .btn-restart:hover {
-            background-color: #0d47a1;
-        }
+        .btn-restart { background-color: #d32f2f; }
+        .btn-restart:hover { background-color: #b71c1c; }
+        .btn-undo { background-color: #f57c00; }
+        .btn-undo:hover { background-color: #e65100; }
 
         .board {
             display: flex;
@@ -88,6 +84,7 @@
             max-width: 650px;
             gap: 15px;
             box-sizing: border-box;
+            position: relative;
         }
 
         .top-bar {
@@ -142,7 +139,11 @@
             font-weight: bold;
             font-size: 1.3rem;
             line-height: 1;
-            transition: transform 0.2s ease, box-shadow 0.2s ease, top 0.3s ease;
+            transition: transform 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                        top 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                        left 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                        box-shadow 0.2s ease;
+            transform-style: preserve-3d;
         }
 
         @media (min-width: 400px) {
@@ -152,17 +153,8 @@
             }
         }
 
-        .card.anim-foundation {
-            animation: enterFoundation 0.35s ease-in-out;
-        }
-
-        @keyframes enterFoundation {
-            0% { transform: scale(1.15); box-shadow: 0px 0px 12px #fff; }
-            100% { transform: scale(1); box-shadow: 1px 1px 4px rgba(0,0,0,0.3); }
-        }
-
         .card.anim-flip {
-            animation: flipCard 0.4s ease-out;
+            animation: flipCard 0.5s ease-out;
         }
 
         @keyframes flipCard {
@@ -175,10 +167,7 @@
             border: 1.5px solid white;
         }
 
-        .card.back * {
-            display: none;
-        }
-
+        .card.back * { display: none; }
         .card.red { color: #d32f2f; }
         .card.black { color: #212121; }
 
@@ -197,20 +186,72 @@
         .column {
             width: var(--card-width);
             max-width: var(--card-max-width);
-            min-height: 350px;
+            min-height: 400px;
             position: relative;
             border-radius: 6px;
             background-color: rgba(0, 0, 0, 0.03);
+        }
+
+        .input-lock {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 99999;
+            display: none;
+        }
+
+        .win-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 100000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .win-screen h2 {
+            font-size: 2rem;
+            color: #ffd700;
+            margin: 0 0 10px 0;
+            text-shadow: 0px 0px 10px rgba(255,215,0,0.5);
+        }
+
+        .win-screen p {
+            font-size: 1.2rem;
+            margin: 0 0 20px 0;
+        }
+
+        .win-screen img {
+            max-width: 90%;
+            max-height: 50vh;
+            border-radius: 8px;
+            box-shadow: 0px 0px 15px rgba(255,255,255,0.4);
+            margin-bottom: 25px;
         }
     </style>
 </head>
 <body>
 
-    <h1>Paciência Simplificado</h1>
+    <div class="input-lock" id="inputLock"></div>
+
+    <div class="win-screen" id="winScreen">
+        <h2>Parabéns! Você Venceu!</h2>
+        <p id="finalTimeText">Tempo Total: 00:00</p>
+        <img src="WhatsApp Image 2026-06-16 at 17.54.42.jpeg" alt="Parabéns">
+        <button class="btn btn-undo" style="background-color: #2e7d32; padding: 10px 20px; font-size: 1.1rem;" onclick="closeWinScreen()">Jogar Novamente</button>
+    </div>
 
     <div class="controls">
         <div class="timer" id="timer">Tempo: 00:00</div>
-        <button class="btn-restart" onclick="restartGame()">Reiniciar</button>
+        <div class="btn-group">
+            <button class="btn btn-undo" onclick="undoAction()">Desfazer</button>
+            <button class="btn btn-restart" onclick="restartGame()">Reiniciar</button>
+        </div>
     </div>
 
     <div class="board">
@@ -220,10 +261,10 @@
                 <div class="slot" id="waste"></div>
             </div>
             <div class="foundation-area">
-                <div class="slot foundation" data-suit="♥"></div>
-                <div class="slot foundation" data-suit="♦"></div>
-                <div class="slot foundation" data-suit="♣"></div>
-                <div class="slot foundation" data-suit="♠"></div>
+                <div class="slot foundation" data-suit="♥" id="f-0"></div>
+                <div class="slot foundation" data-suit="♦" id="f-1"></div>
+                <div class="slot foundation" data-suit="♣" id="f-2"></div>
+                <div class="slot foundation" data-suit="♠" id="f-3"></div>
             </div>
         </div>
 
@@ -241,69 +282,144 @@
     <script>
         const suits = ['♥', '♦', '♣', '♠'];
         const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-        let deck = [];
-        let wastePile = [];
-        let selectedElement = null;
         
-        // Variáveis do Cronômetro
+        let gameState = {
+            deck: [],
+            waste: [],
+            foundations: [[], [], [], []],
+            columns: [[], [], [], [], [], [], []],
+            totalSeconds: 0
+        };
+
+        let undoStack = [];
+        let selectedElement = null;
         let timerInterval = null;
-        let totalSeconds = 0;
+        let isAnimating = false;
 
         function getCardSpacing() {
-            if (window.innerWidth >= 600) return 30; 
-            return window.innerWidth * 0.045;
+            return window.innerWidth >= 600 ? 30 : window.innerWidth * 0.045;
+        }
+
+        function lockInput(duration) {
+            const lock = document.getElementById('inputLock');
+            lock.style.display = 'block';
+            isAnimating = true;
+            setTimeout(() => {
+                lock.style.display = 'none';
+                isAnimating = false;
+            }, duration);
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('solitaire_state_2026', JSON.stringify(gameState));
+            localStorage.setItem('solitaire_undo_2026', JSON.stringify(undoStack));
+        }
+
+        function pushToUndoStack() {
+            undoStack.push(JSON.parse(JSON.stringify(gameState)));
+            if (undoStack.length > 30) undoStack.shift();
+        }
+
+        function undoAction() {
+            if (undoStack.length === 0 || isAnimating) return;
+            gameState = undoStack.pop();
+            resetSelection();
+            renderAll();
+            saveToLocalStorage();
         }
 
         function startTimer() {
             clearInterval(timerInterval);
-            totalSeconds = 0;
-            document.getElementById('timer').innerText = "Tempo: 00:00";
             timerInterval = setInterval(() => {
-                totalSeconds++;
-                const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-                const seconds = String(totalSeconds % 60).padStart(2, '0');
-                document.getElementById('timer').innerText = `Tempo: ${minutes}:${seconds}`;
+                gameState.totalSeconds++;
+                updateTimerDisplay();
+                if(gameState.totalSeconds % 5 === 0) saveToLocalStorage();
             }, 1000);
         }
 
-        function restartGame() {
-            resetSelection();
-            // Limpa fundações
-            document.querySelectorAll('.slot.foundation').forEach(f => f.innerHTML = '');
-            initGame();
+        function updateTimerDisplay() {
+            const minutes = String(Math.floor(gameState.totalSeconds / 60)).padStart(2, '0');
+            const seconds = String(gameState.totalSeconds % 60).padStart(2, '0');
+            document.getElementById('timer').innerText = `Tempo: ${minutes}:${seconds}`;
         }
 
-        function initGame() {
-            deck = [];
-            wastePile = [];
-            document.getElementById('waste').innerHTML = '';
-            
+        function restartGame() {
+            localStorage.removeItem('solitaire_state_2026');
+            localStorage.removeItem('solitaire_undo_2026');
+            undoStack = [];
+            resetSelection();
+            document.getElementById('winScreen').style.display = 'none';
+            initNewGame();
+        }
+
+        function closeWinScreen() {
+            document.getElementById('winScreen').style.display = 'none';
+            restartGame();
+        }
+
+        function initNewGame() {
+            gameState.deck = [];
+            gameState.waste = [];
+            gameState.foundations = [[], [], [], []];
+            gameState.columns = [[], [], [], [], [], [], []];
+            gameState.totalSeconds = 0;
+
+            let pool = [];
             for (let suit of suits) {
                 for (let val of values) {
-                    deck.push({
-                        value: val,
-                        suit: suit,
-                        color: (suit === '♥' || suit === '♦') ? 'red' : 'black'
-                    });
+                    pool.push({ value: val, suit: suit, color: (suit === '♥' || suit === '♦') ? 'red' : 'black', faceUp: false });
                 }
             }
-            deck.sort(() => Math.random() - 0.5);
+            pool.sort(() => Math.random() - 0.5);
 
-            const spacing = getCardSpacing();
+            // CORREÇÃO: Estruturação correta da inversão de cartas no início do jogo
             for (let i = 0; i < 7; i++) {
-                const col = document.getElementById(`col-${i}`);
-                col.innerHTML = '';
                 for (let j = 0; j <= i; j++) {
-                    let cardData = deck.pop();
-                    let isFaceUp = (j === i);
-                    col.appendChild(createCardHTML(cardData, j * spacing, isFaceUp));
+                    let card = pool.pop();
+                    // Apenas a última carta (j === i) começa desinvertida (faceUp: true)
+                    card.faceUp = (j === i);
+                    gameState.columns[i].push(card);
                 }
             }
-            updateStockDisplay();
+            gameState.deck = pool;
+            
             startTimer();
+            renderAll();
+            saveToLocalStorage();
         }
 
-        function createCardHTML(card, topOffset, isFaceUp) {
+        function renderAll() {
+            updateTimerDisplay();
+            
+            const stock = document.getElementById('stock');
+            stock.innerHTML = gameState.deck.length > 0 ? '<div class="card back"></div>' : '';
+
+            const wasteSlot = document.getElementById('waste');
+            wasteSlot.innerHTML = '';
+            gameState.waste.forEach((card, idx) => {
+                wasteSlot.appendChild(createCardUI(card, 0, true, 'waste', idx));
+            });
+
+            for(let i=0; i<4; i++) {
+                const fSlot = document.getElementById(`f-${i}`);
+                fSlot.innerHTML = '';
+                gameState.foundations[i].forEach((card, idx) => {
+                    fSlot.appendChild(createCardUI(card, 0, true, 'foundation', i, idx));
+                });
+            }
+
+            const spacing = getCardSpacing();
+            for(let i=0; i<7; i++) {
+                const colSlot = document.getElementById(`col-${i}`);
+                colSlot.innerHTML = '';
+                gameState.columns[i].forEach((card, idx) => {
+                    colSlot.appendChild(createCardUI(card, idx * spacing, card.faceUp, 'column', i, idx));
+                });
+            }
+            checkWinCondition();
+        }
+
+        function createCardUI(card, topOffset, isFaceUp, originType, p1, p2) {
             const cardDiv = document.createElement('div');
             cardDiv.classList.add('card');
             cardDiv.style.top = `${topOffset}px`;
@@ -311,129 +427,196 @@
             cardDiv.dataset.value = card.value;
             cardDiv.dataset.suit = card.suit;
             cardDiv.dataset.color = card.color;
+            cardDiv.dataset.originType = originType;
+            if(p1 !== undefined) cardDiv.dataset.p1 = p1;
+            if(p2 !== undefined) cardDiv.dataset.p2 = p2;
 
-            const displayValue = card.value === '10' ? '10' : card.value;
+            const displayValue = card.value;
             cardDiv.innerHTML = `<div>${displayValue}${card.suit}</div><div class="bottom-suit">${displayValue}${card.suit}</div>`;
             cardDiv.classList.add(card.color);
 
             if (!isFaceUp) {
                 cardDiv.classList.add('back');
-                cardDiv.onclick = (e) => revealCard(e, cardDiv);
-            } else {
-                cardDiv.onclick = (e) => selectCard(e, cardDiv);
-                cardDiv.ondblclick = (e) => autoSendToFoundation(e, cardDiv);
             }
+
+            cardDiv.onclick = (e) => handleCardClick(e, cardDiv);
             return cardDiv;
         }
 
-        function updateStockDisplay() {
-            const stock = document.getElementById('stock');
-            stock.innerHTML = deck.length > 0 ? '<div class="card back"></div>' : '';
-        }
-
         function drawCard() {
-            if (deck.length === 0) {
-                if(wastePile.length === 0) return;
-                deck = [...wastePile].reverse();
-                wastePile = [];
-                document.getElementById('waste').innerHTML = '';
-                updateStockDisplay();
-                return;
+            if (isAnimating) return;
+            pushToUndoStack();
+            if (gameState.deck.length === 0) {
+                if (gameState.waste.length === 0) return;
+                gameState.deck = [...gameState.waste].reverse().map(c => ({...c, faceUp: false}));
+                gameState.waste = [];
+            } else {
+                let card = gameState.deck.pop();
+                card.faceUp = true;
+                gameState.waste.push(card);
             }
-            let cardData = deck.pop();
-            wastePile.push(cardData);
-            
-            const waste = document.getElementById('waste');
-            const cardDiv = createCardHTML(cardData, 0, true);
-            waste.appendChild(cardDiv);
-            updateStockDisplay();
-
-            // Roda verificação após abrir do monte para pegar Ases imediatamente
-            setTimeout(checkAllAutomovements, 50);
+            renderAll();
+            saveToLocalStorage();
+            setTimeout(checkAllAutomovements, 100);
         }
 
-        function revealCard(event, cardDiv) {
-            if (event) event.stopPropagation();
-            const parent = cardDiv.parentElement;
-            
-            if (cardDiv === parent.lastElementChild && cardDiv.classList.contains('back')) {
-                cardDiv.classList.remove('back');
-                cardDiv.classList.add('anim-flip');
-                cardDiv.onclick = (e) => selectCard(e, cardDiv);
-                cardDiv.ondblclick = (e) => autoSendToFoundation(e, cardDiv);
-                
-                setTimeout(() => {
-                    cardDiv.classList.remove('anim-flip');
-                    checkAllAutomovements(); // Varre movimentos após virar do tabuleiro
-                }, 400);
-            }
+        function animateToElement(element, targetContainer, finalTop, callback) {
+            lockInput(650);
+            const origRect = element.getBoundingClientRect();
+            targetContainer.appendChild(element);
+            element.style.top = `${finalTop}px`;
+            const destRect = element.getBoundingClientRect();
+
+            element.style.transition = 'none';
+            element.style.transform = `translate(${origRect.left - destRect.left}px, ${origRect.top - destRect.top}px)`;
+            element.getBoundingClientRect();
+
+            element.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), top 0.6s cubic-bezier(0.25, 0.8, 0.25, 1)';
+            element.style.transform = 'translate(0, 0)';
+
+            setTimeout(() => {
+                element.style.transition = '';
+                if(callback) callback();
+            }, 600);
         }
 
-        function autoRevealTopCards() {
-            document.querySelectorAll('.column').forEach(col => {
-                if (col.children.length > 0) {
-                    const topCard = col.lastElementChild;
-                    if (topCard.classList.contains('back')) {
-                        revealCard(null, topCard);
-                    }
-                }
-            });
-        }
-
-        function selectCard(event, cardDiv) {
+        function handleCardClick(event, cardDiv) {
             event.stopPropagation();
-            
-            if (selectedElement === cardDiv) {
-                resetSelection();
+            if (isAnimating) return;
+
+            const type = cardDiv.dataset.originType;
+            const colIdx = parseInt(cardDiv.dataset.p1);
+            const cardIdx = parseInt(cardDiv.dataset.p2);
+
+            // Revela a carta invertida caso ela seja a última disponível na base da coluna
+            if (cardDiv.classList.contains('back')) {
+                if (type === 'column' && cardIdx === gameState.columns[colIdx].length - 1) {
+                    pushToUndoStack();
+                    gameState.columns[colIdx][cardIdx].faceUp = true;
+                    cardDiv.classList.remove('back');
+                    cardDiv.classList.add('anim-flip');
+                    lockInput(500);
+                    setTimeout(() => {
+                        renderAll();
+                        saveToLocalStorage();
+                        checkAllAutomovements();
+                    }, 480);
+                }
                 return;
+            }
+
+            if (type === 'waste') {
+                let moved = tryAutoMoveWasteToAnyColumn(cardDiv);
+                if (moved) return;
+            }
+
+            if (type === 'column' && !selectedElement) {
+                let moved = tryAutoMoveToOtherColumn(colIdx, cardIdx, cardDiv);
+                if (moved) return;
             }
 
             if (!selectedElement) {
+                if (type === 'foundation') return;
                 selectedElement = cardDiv;
                 cardDiv.style.outline = "3px solid #ffeb3b";
-                cardDiv.style.zIndex = "999"; 
+                cardDiv.style.zIndex = "999";
             } else {
-                const parent = cardDiv.parentElement;
-                if (parent.classList.contains('column') && cardDiv === parent.lastElementChild) {
-                    moveCardToColumn(selectedElement, parent);
+                if (selectedElement === cardDiv) {
+                    resetSelection();
+                    return;
+                }
+                if (type === 'column' && cardIdx === gameState.columns[colIdx].length - 1) {
+                    executeManualMove(selectedElement, 'column', colIdx);
                 }
                 resetSelection();
             }
+        }
+
+        function tryAutoMoveWasteToAnyColumn(cardDiv) {
+            if (gameState.waste.length === 0) return false;
+            const movingCard = gameState.waste[gameState.waste.length - 1];
+            const movingValIdx = values.indexOf(movingCard.value);
+
+            for (let i = 0; i < 7; i++) {
+                const targetCol = gameState.columns[i];
+                if (targetCol.length > 0) {
+                    const targetCard = targetCol[targetCol.length - 1];
+                    const targetValIdx = values.indexOf(targetCard.value);
+
+                    if (movingCard.color !== targetCard.color && movingValIdx === targetValIdx - 1) {
+                        pushToUndoStack();
+                        gameState.waste.pop();
+
+                        const targetSlot = document.getElementById(`col-${i}`);
+                        const finalTop = targetCol.length * getCardSpacing();
+
+                        animateToElement(cardDiv, targetSlot, finalTop, () => {
+                            gameState.columns[i].push(movingCard);
+                            renderAll();
+                            saveToLocalStorage();
+                            setTimeout(checkAllAutomovements, 100);
+                        });
+                        return true;
+                    }
+                } else if (movingCard.value === 'K') {
+                    pushToUndoStack();
+                    gameState.waste.pop();
+
+                    const targetSlot = document.getElementById(`col-${i}`);
+                    animateToElement(cardDiv, targetSlot, 0, () => {
+                        gameState.columns[i].push(movingCard);
+                        renderAll();
+                        saveToLocalStorage();
+                        setTimeout(checkAllAutomovements, 100);
+                    });
+                    return true;
+                }
+            }
+            return false;
         }
 
         document.querySelectorAll('.column, .foundation').forEach(slot => {
             slot.onclick = () => {
-                if (selectedElement) {
-                    if (slot.classList.contains('column') && slot.children.length === 0) {
-                        moveCardToColumn(selectedElement, slot);
-                    } else if (slot.classList.contains('foundation')) {
-                        moveCardToFoundation(selectedElement, slot);
-                    }
-                    resetSelection();
+                if (!selectedElement || isAnimating) return;
+                
+                if (slot.classList.contains('column') && slot.children.length === 0) {
+                    const colIdx = parseInt(slot.id.split('-')[1]);
+                    executeManualMove(selectedElement, 'column', colIdx);
+                } else if (slot.classList.contains('foundation')) {
+                    const fIdx = parseInt(slot.id.split('-')[1]);
+                    executeManualMove(selectedElement, 'foundation', fIdx);
                 }
+                resetSelection();
             };
         });
 
-        function autoSendToFoundation(event, cardDiv) {
-            if (event) event.stopPropagation();
-            if (cardDiv.nextElementSibling) return false;
+        function tryAutoMoveToOtherColumn(srcColIdx, srcCardIdx, cardDiv) {
+            const movingCard = gameState.columns[srcColIdx][srcCardIdx];
+            const movingValIdx = values.indexOf(movingCard.value);
 
-            const foundations = document.querySelectorAll('.slot.foundation');
-            let targetFoundation = Array.from(foundations).find(f => f.dataset.suit === cardDiv.dataset.suit);
+            for (let i = 0; i < 7; i++) {
+                if (i === srcColIdx) continue;
+                const targetCol = gameState.columns[i];
+                
+                if (targetCol.length > 0) {
+                    const targetCard = targetCol[targetCol.length - 1];
+                    const targetValIdx = values.indexOf(targetCard.value);
 
-            if (targetFoundation) {
-                if (cardDiv.dataset.value === 'A' && targetFoundation.children.length === 0) {
-                    executeFoundationMove(cardDiv, targetFoundation);
-                    resetSelection();
-                    return true;
-                } else if (targetFoundation.children.length > 0) {
-                    const topFoundationCard = targetFoundation.lastElementChild;
-                    const currentValueIdx = values.indexOf(cardDiv.dataset.value);
-                    const topValueIdx = values.indexOf(topFoundationCard.dataset.value);
-                    
-                    if (currentValueIdx === topValueIdx + 1) {
-                        executeFoundationMove(cardDiv, targetFoundation);
-                        resetSelection();
+                    if (movingCard.color !== targetCard.color && movingValIdx === targetValIdx - 1) {
+                        pushToUndoStack();
+                        const cardsToMove = gameState.columns[srcColIdx].splice(srcCardIdx);
+                        
+                        const targetSlot = document.getElementById(`col-${i}`);
+                        const spacing = getCardSpacing();
+                        const initialTargetLength = targetCol.length;
+
+                        animateToElement(cardDiv, targetSlot, initialTargetLength * spacing, () => {
+                            gameState.columns[i] = gameState.columns[i].concat(cardsToMove);
+                            autoRevealTopCards();
+                            renderAll();
+                            saveToLocalStorage();
+                            setTimeout(checkAllAutomovements, 100);
+                        });
                         return true;
                     }
                 }
@@ -441,110 +624,139 @@
             return false;
         }
 
-        function executeFoundationMove(cardDiv, foundation) {
-            cardDiv.style.top = '0px';
-            cardDiv.style.outline = 'none';
-            cardDiv.style.zIndex = '';
-            
-            cardDiv.onclick = null; 
-            cardDiv.ondblclick = null;
-            
-            if(cardDiv.parentElement && cardDiv.parentElement.id === 'waste') {
-                wastePile.pop();
+        function executeManualMove(el, destType, destIdx) {
+            const srcType = el.dataset.originType;
+            const srcP1 = parseInt(el.dataset.p1);
+            const srcP2 = parseInt(el.dataset.p2);
+
+            let cardsToMove = [];
+            let targetModel = (destType === 'column') ? gameState.columns[destIdx] : gameState.foundations[destIdx];
+
+            if (srcType === 'waste') {
+                cardsToMove.push(gameState.waste[gameState.waste.length - 1]);
+            } else if (srcType === 'column') {
+                cardsToMove = gameState.columns[srcP1].slice(srcP2);
             }
 
-            foundation.appendChild(cardDiv);
-            
-            cardDiv.classList.add('anim-foundation');
-            setTimeout(() => cardDiv.classList.remove('anim-foundation'), 350);
+            if (cardsToMove.length === 0) return;
+            const rootCard = cardsToMove[0];
 
-            setTimeout(() => {
+            if (destType === 'column') {
+                if (targetModel.length > 0) {
+                    const targetCard = targetModel[targetModel.length - 1];
+                    if (rootCard.color === targetCard.color || values.indexOf(rootCard.value) !== values.indexOf(targetCard.value) - 1) return;
+                } else {
+                    if (rootCard.value !== 'K') return;
+                }
+            } else if (destType === 'foundation') {
+                if (cardsToMove.length > 1) return; 
+                const fSlot = document.getElementById(`f-${destIdx}`);
+                if (rootCard.suit !== fSlot.dataset.suit) return;
+
+                if (targetModel.length === 0) {
+                    if (rootCard.value !== 'A') return;
+                } else {
+                    const topF = targetModel[targetModel.length - 1];
+                    if (values.indexOf(rootCard.value) !== values.indexOf(topF.value) + 1) return;
+                }
+            }
+
+            pushToUndoStack();
+
+            if (srcType === 'waste') gameState.waste.pop();
+            else if (srcType === 'column') gameState.columns[srcP1].splice(srcP2);
+
+            const destContainer = (destType === 'column') ? document.getElementById(`col-${destIdx}`) : document.getElementById(`f-${destIdx}`);
+            const finalTop = (destType === 'column') ? targetModel.length * getCardSpacing() : 0;
+
+            animateToElement(el, destContainer, finalTop, () => {
+                if (destType === 'column') gameState.columns[destIdx] = gameState.columns[destIdx].concat(cardsToMove);
+                else targetModel.push(rootCard);
+
                 autoRevealTopCards();
-                checkAllAutomovements();
-            }, 100);
+                renderAll();
+                saveToLocalStorage();
+                setTimeout(checkAllAutomovements, 150);
+            });
+        }
+
+        function autoRevealTopCards() {
+            let revealed = false;
+            gameState.columns.forEach((col) => {
+                if (col.length > 0 && !col[col.length - 1].faceUp) {
+                    col[col.length - 1].faceUp = true;
+                    revealed = true;
+                }
+            });
+            return revealed;
         }
 
         function checkAllAutomovements() {
-            let movedAny = false;
-            
-            // 1. Testa as colunas
-            document.querySelectorAll('.column').forEach(col => {
-                if (col.children.length > 0) {
-                    const card = col.lastElementChild;
-                    if (!card.classList.contains('back')) {
-                        if (autoSendToFoundation(null, card)) movedAny = true;
-                    }
+            if (isAnimating) return;
+
+            for (let i = 0; i < 7; i++) {
+                const col = gameState.columns[i];
+                if (col.length > 0) {
+                    const card = col[col.length - 1];
+                    if (card.faceUp && tryAutoSendCard(card, 'column', i)) return;
                 }
+            }
+
+            if (gameState.waste.length > 0) {
+                const card = gameState.waste[gameState.waste.length - 1];
+                if (tryAutoSendCard(card, 'waste')) return;
+            }
+        }
+
+        function tryAutoSendCard(card, originType, colIdx) {
+            const targetFIdx = suits.indexOf(card.suit);
+            const fModel = gameState.foundations[targetFIdx];
+
+            let canMove = false;
+            if (fModel.length === 0 && card.value === 'A') canMove = true;
+            else if (fModel.length > 0) {
+                const topF = fModel[fModel.length - 1];
+                if (values.indexOf(card.value) === values.indexOf(topF.value) + 1) canMove = true;
+            }
+
+            if (canMove) {
+                pushToUndoStack();
+                if (originType === 'column') gameState.columns[colIdx].pop();
+                else gameState.waste.pop();
+
+                let cardEl = document.querySelector(`.card[data-value="${card.value}"][data-suit="${card.suit}"]`);
+                if (!cardEl) return false;
+
+                const destContainer = document.getElementById(`f-${targetFIdx}`);
+                
+                animateToElement(cardEl, destContainer, 0, () => {
+                    fModel.push(card);
+                    autoRevealTopCards();
+                    renderAll();
+                    saveToLocalStorage();
+                    setTimeout(checkAllAutomovements, 350); 
+                });
+                return true;
+            }
+            return false;
+        }
+
+        function checkWinCondition() {
+            let won = true;
+            gameState.foundations.forEach(f => {
+                if (f.length !== 13) won = false;
             });
 
-            // 2. CORREÇÃO: Testa o descarte com precisão e prioridade
-            const waste = document.getElementById('waste');
-            if (waste && waste.children.length > 0) {
-                const wasteCard = waste.lastElementChild;
-                if (autoSendToFoundation(null, wasteCard)) movedAny = true;
-            }
-
-            if (movedAny) {
-                setTimeout(checkAllAutomovements, 150);
-            }
-        }
-
-        function moveCardToColumn(card, column) {
-            const sourceColumn = card.parentElement;
-            if (sourceColumn === column) return;
-
-            const spacing = getCardSpacing();
-
-            if (column.children.length > 0) {
-                const targetCard = column.lastElementChild;
-                const cardValueIdx = values.indexOf(card.dataset.value);
-                const targetValueIdx = values.indexOf(targetCard.dataset.value);
-
-                if (card.dataset.color === targetCard.dataset.color || cardValueIdx !== targetValueIdx - 1) {
-                    return; 
-                }
-            } else {
-                if (card.dataset.value !== 'K') return;
-            }
-            
-            if (sourceColumn && sourceColumn.classList.contains('column')) {
-                const cardsArray = Array.from(sourceColumn.children);
-                const cardIndex = cardsArray.indexOf(card);
-                const cardsToMove = cardsArray.slice(cardIndex);
+            if (won) {
+                clearInterval(timerInterval);
+                const minutes = String(Math.floor(gameState.totalSeconds / 60)).padStart(2, '0');
+                const seconds = String(gameState.totalSeconds % 60).padStart(2, '0');
                 
-                cardsToMove.forEach(c => {
-                    const topOffset = column.children.length * spacing;
-                    c.style.top = `${topOffset}px`;
-                    column.appendChild(c);
-                });
-            } else {
-                if (sourceColumn && sourceColumn.id === 'waste') wastePile.pop();
-                const topOffset = column.children.length * spacing;
-                card.style.top = `${topOffset}px`;
-                column.appendChild(card);
-            }
-
-            setTimeout(() => {
-                autoRevealTopCards();
-                checkAllAutomovements();
-            }, 100);
-        }
-
-        function moveCardToFoundation(card, foundation) {
-            if (card.nextElementSibling) return; 
-
-            if (card.dataset.suit === foundation.dataset.suit) {
-                if (foundation.children.length === 0 && card.dataset.value === 'A') {
-                    executeFoundationMove(card, foundation);
-                } else if (foundation.children.length > 0) {
-                    const topFoundationCard = foundation.lastElementChild;
-                    const currentValueIdx = values.indexOf(card.dataset.value);
-                    const topValueIdx = values.indexOf(topFoundationCard.dataset.value);
-                    
-                    if (currentValueIdx === topValueIdx + 1) {
-                        executeFoundationMove(card, foundation);
-                    }
-                }
+                document.getElementById('finalTimeText').innerText = `Tempo Total: ${minutes}:${seconds}`;
+                document.getElementById('winScreen').style.display = 'flex';
+                
+                localStorage.removeItem('solitaire_state_2026');
+                localStorage.removeItem('solitaire_undo_2026');
             }
         }
 
@@ -557,15 +769,21 @@
         }
 
         window.onresize = () => {
-            const spacing = getCardSpacing();
-            document.querySelectorAll('.column').forEach(col => {
-                Array.from(col.children).forEach((c, idx) => {
-                    c.style.top = `${idx * spacing}px`;
-                });
-            });
+            if(!isAnimating) renderAll();
         };
 
-        initGame();
+        (function loadGame() {
+            const savedState = localStorage.getItem('solitaire_state_2026');
+            const savedUndo = localStorage.getItem('solitaire_undo_2026');
+            if (savedState) {
+                gameState = JSON.parse(savedState);
+                if(savedUndo) undoStack = JSON.parse(savedUndo);
+                startTimer();
+                renderAll();
+            } else {
+                initNewGame();
+            }
+        })();
     </script>
 </body>
 </html>
