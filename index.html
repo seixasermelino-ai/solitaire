@@ -23,7 +23,7 @@
         }
 
         body {
-            background-color: #2e7d32;
+            background-color: #4b5320; /* Alterado para Verde Exército */
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 15px 5px;
@@ -372,11 +372,9 @@
             }
             pool.sort(() => Math.random() - 0.5);
 
-            // CORREÇÃO: Estruturação correta da inversão de cartas no início do jogo
             for (let i = 0; i < 7; i++) {
                 for (let j = 0; j <= i; j++) {
                     let card = pool.pop();
-                    // Apenas a última carta (j === i) começa desinvertida (faceUp: true)
                     card.faceUp = (j === i);
                     gameState.columns[i].push(card);
                 }
@@ -488,7 +486,6 @@
             const colIdx = parseInt(cardDiv.dataset.p1);
             const cardIdx = parseInt(cardDiv.dataset.p2);
 
-            // Revela a carta invertida caso ela seja a última disponível na base da coluna
             if (cardDiv.classList.contains('back')) {
                 if (type === 'column' && cardIdx === gameState.columns[colIdx].length - 1) {
                     pushToUndoStack();
@@ -505,6 +502,14 @@
                 return;
             }
 
+            // CORREÇÃO: Força envio imediato do Ás ao clicar se ele estiver na coluna
+            if (type === 'column' && cardDiv.dataset.value === 'A') {
+                const movingCard = gameState.columns[colIdx][cardIdx];
+                if (cardIdx === gameState.columns[colIdx].length - 1 && tryAutoSendCard(movingCard, 'column', colIdx)) {
+                    return;
+                }
+            }
+
             if (type === 'waste') {
                 let moved = tryAutoMoveWasteToAnyColumn(cardDiv);
                 if (moved) return;
@@ -515,8 +520,18 @@
                 if (moved) return;
             }
 
+            // CORREÇÃO: Permite selecionar ou clicar na carta da fundação para tentar movê-la para o tableau
+            if (type === 'foundation' && !selectedElement) {
+                let moved = tryAutoMoveFoundationToAnyColumn(colIdx, cardDiv);
+                if (moved) return;
+                
+                selectedElement = cardDiv;
+                cardDiv.style.outline = "3px solid #ffeb3b";
+                cardDiv.style.zIndex = "999";
+                return;
+            }
+
             if (!selectedElement) {
-                if (type === 'foundation') return;
                 selectedElement = cardDiv;
                 cardDiv.style.outline = "3px solid #ffeb3b";
                 cardDiv.style.zIndex = "999";
@@ -530,6 +545,49 @@
                 }
                 resetSelection();
             }
+        }
+
+        // CORREÇÃO: Nova função para tirar da fundação e mandar de volta ao Tableau sem entrar em loop infinito
+        function tryAutoMoveFoundationToAnyColumn(fIdx, cardDiv) {
+            const fModel = gameState.foundations[fIdx];
+            if (fModel.length === 0) return false;
+            const movingCard = fModel[fModel.length - 1];
+            const movingValIdx = values.indexOf(movingCard.value);
+
+            for (let i = 0; i < 7; i++) {
+                const targetCol = gameState.columns[i];
+                if (targetCol.length > 0) {
+                    const targetCard = targetCol[targetCol.length - 1];
+                    const targetValIdx = values.indexOf(targetCard.value);
+
+                    if (movingCard.color !== targetCard.color && movingValIdx === targetValIdx - 1) {
+                        pushToUndoStack();
+                        fModel.pop();
+
+                        const targetSlot = document.getElementById(`col-${i}`);
+                        const finalTop = targetCol.length * getCardSpacing();
+
+                        animateToElement(cardDiv, targetSlot, finalTop, () => {
+                            gameState.columns[i].push(movingCard);
+                            renderAll();
+                            saveToLocalStorage();
+                        });
+                        return true;
+                    }
+                } else if (movingCard.value === 'K') {
+                    pushToUndoStack();
+                    fModel.pop();
+
+                    const targetSlot = document.getElementById(`col-${i}`);
+                    animateToElement(cardDiv, targetSlot, 0, () => {
+                        gameState.columns[i].push(movingCard);
+                        renderAll();
+                        saveToLocalStorage();
+                    });
+                    return true;
+                }
+            }
+            return false;
         }
 
         function tryAutoMoveWasteToAnyColumn(cardDiv) {
@@ -636,6 +694,8 @@
                 cardsToMove.push(gameState.waste[gameState.waste.length - 1]);
             } else if (srcType === 'column') {
                 cardsToMove = gameState.columns[srcP1].slice(srcP2);
+            } else if (srcType === 'foundation') {
+                cardsToMove.push(gameState.foundations[srcP1][gameState.foundations[srcP1].length - 1]);
             }
 
             if (cardsToMove.length === 0) return;
@@ -665,6 +725,7 @@
 
             if (srcType === 'waste') gameState.waste.pop();
             else if (srcType === 'column') gameState.columns[srcP1].splice(srcP2);
+            else if (srcType === 'foundation') gameState.foundations[srcP1].pop();
 
             const destContainer = (destType === 'column') ? document.getElementById(`col-${destIdx}`) : document.getElementById(`f-${destIdx}`);
             const finalTop = (destType === 'column') ? targetModel.length * getCardSpacing() : 0;
@@ -676,7 +737,9 @@
                 autoRevealTopCards();
                 renderAll();
                 saveToLocalStorage();
-                setTimeout(checkAllAutomovements, 150);
+                if (destType === 'foundation') {
+                    setTimeout(checkAllAutomovements, 150);
+                }
             });
         }
 
@@ -724,10 +787,10 @@
                 if (originType === 'column') gameState.columns[colIdx].pop();
                 else gameState.waste.pop();
 
-                let cardEl = document.querySelector(`.card[data-value="${card.value}"][data-suit="${card.suit}"]`);
+                let cardEl = document.querySelector(`.card[data-value="${card.value}"][data-suit="${card.suit}"][data-origin-type="${originType}"]`);
                 if (!cardEl) return false;
 
-                const destContainer = document.getElementById(`f-${targetFIdx}`);
+                const destContainer = document.getElementById('f-' + targetFIdx);
                 
                 animateToElement(cardEl, destContainer, 0, () => {
                     fModel.push(card);
