@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Paciência (Solitaire) - Regras Completas</title>
+    <title>Mini Paciência (Solitaire) - Pro</title>
     <style>
         :root {
             --card-width: 12vw;
@@ -37,10 +37,48 @@
 
         h1 {
             color: white;
-            margin: 0 0 10px 0;
+            margin: 0 0 5px 0;
             font-size: 1.4rem;
             text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
             text-align: center;
+        }
+
+        /* Painel de Controle (Timer e Reiniciar) */
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 650px;
+            margin-bottom: 12px;
+            padding: 0 4px;
+            box-sizing: border-box;
+            color: white;
+            font-weight: bold;
+        }
+
+        .timer {
+            font-size: 1.1rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .btn-restart {
+            background-color: #1565c0;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+
+        .btn-restart:hover {
+            background-color: #0d47a1;
         }
 
         .board {
@@ -170,6 +208,11 @@
 
     <h1>Paciência Simplificado</h1>
 
+    <div class="controls">
+        <div class="timer" id="timer">Tempo: 00:00</div>
+        <button class="btn-restart" onclick="restartGame()">Reiniciar</button>
+    </div>
+
     <div class="board">
         <div class="top-bar">
             <div class="deck-area">
@@ -201,10 +244,33 @@
         let deck = [];
         let wastePile = [];
         let selectedElement = null;
+        
+        // Variáveis do Cronômetro
+        let timerInterval = null;
+        let totalSeconds = 0;
 
         function getCardSpacing() {
             if (window.innerWidth >= 600) return 30; 
             return window.innerWidth * 0.045;
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            totalSeconds = 0;
+            document.getElementById('timer').innerText = "Tempo: 00:00";
+            timerInterval = setInterval(() => {
+                totalSeconds++;
+                const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+                const seconds = String(totalSeconds % 60).padStart(2, '0');
+                document.getElementById('timer').innerText = `Tempo: ${minutes}:${seconds}`;
+            }, 1000);
+        }
+
+        function restartGame() {
+            resetSelection();
+            // Limpa fundações
+            document.querySelectorAll('.slot.foundation').forEach(f => f.innerHTML = '');
+            initGame();
         }
 
         function initGame() {
@@ -234,6 +300,7 @@
                 }
             }
             updateStockDisplay();
+            startTimer();
         }
 
         function createCardHTML(card, topOffset, isFaceUp) {
@@ -280,6 +347,9 @@
             const cardDiv = createCardHTML(cardData, 0, true);
             waste.appendChild(cardDiv);
             updateStockDisplay();
+
+            // Roda verificação após abrir do monte para pegar Ases imediatamente
+            setTimeout(checkAllAutomovements, 50);
         }
 
         function revealCard(event, cardDiv) {
@@ -292,7 +362,10 @@
                 cardDiv.onclick = (e) => selectCard(e, cardDiv);
                 cardDiv.ondblclick = (e) => autoSendToFoundation(e, cardDiv);
                 
-                setTimeout(() => cardDiv.classList.remove('anim-flip'), 400);
+                setTimeout(() => {
+                    cardDiv.classList.remove('anim-flip');
+                    checkAllAutomovements(); // Varre movimentos após virar do tabuleiro
+                }, 400);
             }
         }
 
@@ -310,7 +383,6 @@
         function selectCard(event, cardDiv) {
             event.stopPropagation();
             
-            // CORREÇÃO: Se clicar na mesma carta já selecionada, apenas cancela a seleção
             if (selectedElement === cardDiv) {
                 resetSelection();
                 return;
@@ -322,7 +394,6 @@
                 cardDiv.style.zIndex = "999"; 
             } else {
                 const parent = cardDiv.parentElement;
-                // Ao clicar em uma carta exposta tendo outra selecionada, tenta mover para a coluna dela
                 if (parent.classList.contains('column') && cardDiv === parent.lastElementChild) {
                     moveCardToColumn(selectedElement, parent);
                 }
@@ -396,6 +467,7 @@
         function checkAllAutomovements() {
             let movedAny = false;
             
+            // 1. Testa as colunas
             document.querySelectorAll('.column').forEach(col => {
                 if (col.children.length > 0) {
                     const card = col.lastElementChild;
@@ -405,9 +477,11 @@
                 }
             });
 
+            // 2. CORREÇÃO: Testa o descarte com precisão e prioridade
             const waste = document.getElementById('waste');
             if (waste && waste.children.length > 0) {
-                if (autoSendToFoundation(null, waste.lastElementChild)) movedAny = true;
+                const wasteCard = waste.lastElementChild;
+                if (autoSendToFoundation(null, wasteCard)) movedAny = true;
             }
 
             if (movedAny) {
@@ -415,33 +489,24 @@
             }
         }
 
-        // CORREÇÃO: Implementação das regras rígidas de empilhamento do Solitaire (Número decrescente + Cor alternada)
         function moveCardToColumn(card, column) {
             const sourceColumn = card.parentElement;
-            
-            // Impede mover se você tentar soltar a carta na mesma coluna em que ela já está
             if (sourceColumn === column) return;
 
             const spacing = getCardSpacing();
 
-            // Se a coluna destino já tiver cartas, precisamos validar a última carta dela
             if (column.children.length > 0) {
                 const targetCard = column.lastElementChild;
-
                 const cardValueIdx = values.indexOf(card.dataset.value);
                 const targetValueIdx = values.indexOf(targetCard.dataset.value);
 
-                // Regra 1: A cor precisa ser diferente (Preto vs Vermelho)
-                // Regra 2: O valor da carta movida deve ser exatamente 1 número MENOR do que o alvo
                 if (card.dataset.color === targetCard.dataset.color || cardValueIdx !== targetValueIdx - 1) {
-                    return; // Movimento inválido, cancela a operação
+                    return; 
                 }
             } else {
-                // Regra Tradicional opcional: Se a coluna estiver vazia, apenas Reis (K) podem iniciar a coluna.
                 if (card.dataset.value !== 'K') return;
             }
             
-            // Movimentando a carta (e possíveis cartas filhas que estejam presas a ela)
             if (sourceColumn && sourceColumn.classList.contains('column')) {
                 const cardsArray = Array.from(sourceColumn.children);
                 const cardIndex = cardsArray.indexOf(card);
@@ -453,7 +518,6 @@
                     column.appendChild(c);
                 });
             } else {
-                // Se veio do monte de descarte (waste)
                 if (sourceColumn && sourceColumn.id === 'waste') wastePile.pop();
                 const topOffset = column.children.length * spacing;
                 card.style.top = `${topOffset}px`;
